@@ -1,36 +1,264 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🛒 FreshCart - Grocery Delivery Application
 
-## Getting Started
+A modern, full-stack grocery delivery platform built with Next.js 16, featuring real-time order tracking, role-based authentication, and an intuitive user experience for customers, delivery partners, and administrators.
 
-First, run the development server:
+## ✨ Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 🛍️ Customer Features
+- **Browse & Search**: Explore products by categories with advanced search and filtering
+- **Smart Cart Management**: Add, update, and remove items with real-time price calculations
+- **Saved Addresses**: Store multiple delivery addresses with interactive map selection
+- **Secure Checkout**: Streamlined checkout process with multiple payment options
+- **Order Tracking**: Real-time order status updates with live map tracking
+- **Order History**: View past orders and reorder with one click
+- **Email Verification**: OTP-based email verification for secure account creation
+
+### 🚚 Delivery Partner Features
+- **Real-Time Notifications**: Instant Socket.io-powered order notifications
+- **Order Management**: Accept, reject, and update order status
+- **Live Tracking**: Update delivery location in real-time
+- **Earnings Dashboard**: Track deliveries and earnings
+- **Route Optimization**: Interactive maps for efficient delivery routes
+
+### 👨‍💼 Admin Features
+- **Product Management**: Create, update, and delete products with image uploads
+- **Category Management**: Organize products into categories
+- **User Management**: Create and manage delivery partner accounts
+- **Order Overview**: Monitor all orders and their statuses
+- **Analytics Dashboard**: Track sales, popular products, and delivery performance
+
+### 🔐 Authentication & Security
+- **Role-Based Access Control**: Separate interfaces for customers, delivery partners, and admins
+- **NextAuth Integration**: Secure JWT-based authentication
+- **Email Verification**: OTP verification using Resend/Nodemailer
+- **Password Reset**: Secure password recovery flow
+- **Protected Routes**: Middleware-based route protection
+
+### 🌐 Real-Time Features
+- **Socket.io Integration**: Real-time order notifications and status updates
+- **Live Order Tracking**: Track delivery partners on interactive maps
+- **Instant Updates**: No polling - efficient WebSocket connections
+- **Multi-User Support**: Handle multiple simultaneous orders
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 16 (App Router)
+- **UI Library**: React 19
+- **Styling**: Tailwind CSS 4
+- **State Management**: Zustand
+- **Animations**: Framer Motion
+- **Icons**: Lucide React
+- **Maps**: React Leaflet, Google Maps API
+- **Notifications**: React Hot Toast
+- **File Upload**: React Dropzone
+
+### Backend
+- **Runtime**: Node.js
+- **Database**: MongoDB with Mongoose ODM
+- **Authentication**: NextAuth.js
+- **Real-Time**: Socket.io
+- **Email**: Nodemailer
+- **Image Storage**: Cloudinary
+- **AI Integration**: Google Generative AI (Gemini)
+
+### Development Tools
+- **Linting**: ESLint
+- **Package Manager**: npm
+- **Version Control**: Git
+
+## 📁 Project Structure
+
+```
+grocery-delivery-app/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── admin/             # Admin dashboard pages
+│   │   ├── api/               # API routes
+│   │   ├── cart/              # Shopping cart page
+│   │   ├── checkout/          # Checkout flow
+│   │   ├── customer/          # Customer dashboard
+│   │   ├── delivery/          # Delivery partner dashboard
+│   │   ├── login/             # Authentication pages
+│   │   ├── my-orders/         # Order history
+│   │   ├── products/          # Product listing & details
+│   │   └── settings/          # User settings
+│   ├── components/            # Reusable React components
+│   │   ├── admin/            # Admin-specific components
+│   │   ├── auth/             # Authentication components
+│   │   ├── cart/             # Cart components
+│   │   ├── checkout/         # Checkout components
+│   │   ├── delivery/         # Delivery partner components
+│   │   ├── orders/           # Order tracking components
+│   │   └── products/         # Product display components
+│   ├── lib/                   # Utility functions
+│   │   ├── db.js             # MongoDB connection
+│   │   ├── auth.js           # NextAuth configuration
+│   │   └── socket.js         # Socket.io server setup
+│   ├── models/                # Mongoose schemas
+│   │   ├── User.js           # User model
+│   │   ├── Product.js        # Product model
+│   │   ├── Order.js          # Order model
+│   │   ├── Cart.js           # Cart model
+│   │   ├── Address.js        # Address model
+│   │   └── Category.js       # Category model
+│   ├── store/                 # Zustand state management
+│   └── middleware.js          # Route protection middleware
+├── scripts/                   # Utility scripts
+│   └── seed.js               # Database seeding script
+├── public/                    # Static assets
+├── .env.local                # Environment variables
+└── server.js                 # Custom server with Socket.io
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Getting Started
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Prerequisites
+- Node.js 18+ installed
+- MongoDB Atlas account (free tier)
+- npm or yarn package manager
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Installation
 
-## Learn More
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd grocery-delivery-app
+```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Install dependencies**
+```bash
+npm install
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Set up environment variables**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Create a `.env.local` file in the root directory:
 
-## Deploy on Vercel
+```env
+# MongoDB
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/grocery-delivery?retryWrites=true&w=majority
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# NextAuth
+NEXTAUTH_SECRET=your-secret-key-here
+NEXTAUTH_URL=http://localhost:3000
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Socket.io
+NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+
+# Google Maps (optional)
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+
+# Cloudinary (optional)
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+
+# Gemini AI (optional)
+GEMINI_API_KEY=your-gemini-api-key
+
+# Email (optional)
+EMAIL_SERVER_USER=your-email@example.com
+EMAIL_SERVER_PASSWORD=your-email-password
+EMAIL_SERVER_HOST=smtp.gmail.com
+EMAIL_SERVER_PORT=587
+EMAIL_FROM=noreply@freshcart.com
+```
+
+4. **Seed the database**
+```bash
+npm run seed
+```
+
+5. **Run the development server**
+```bash
+npm run dev
+```
+
+6. **Open your browser**
+Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Demo Credentials
+
+After seeding, use these credentials to explore different roles:
+
+**Admin Account**
+- Email: `admin@freshcart.com`
+- Password: `admin123`
+
+**Customer Account**
+- Email: `customer@example.com`
+- Password: `customer123`
+
+**Delivery Partner Account**
+- Email: `delivery@freshcart.com`
+- Password: `delivery123`
+
+## 📚 Documentation
+
+- [API Documentation](./API_DOCUMENTATION.md) - Complete API reference
+- [Database Setup Guide](./DATABASE_SETUP.md) - MongoDB configuration and seeding
+
+## 🎯 Key Workflows
+
+### Customer Journey
+1. Sign up with email verification
+2. Browse products by category
+3. Add items to cart
+4. Save delivery addresses with map selection
+5. Complete checkout
+6. Track order in real-time
+7. View order history
+
+### Delivery Partner Journey
+1. Receive real-time order notifications
+2. Accept or reject orders
+3. Update order status (picked up, in transit, delivered)
+4. Update location for live tracking
+5. View earnings and delivery history
+
+### Admin Journey
+1. Manage product catalog
+2. Create delivery partner accounts
+3. Monitor all orders
+4. View analytics and reports
+
+## 🔧 Available Scripts
+
+```bash
+npm run dev          # Start development server with Socket.io
+npm run build        # Build for production
+npm start            # Start production server
+npm run lint         # Run ESLint
+npm run seed         # Seed database with sample data
+```
+
+## 🌟 Highlights
+
+- **Modern UI/UX**: Clean, responsive design with smooth animations
+- **Real-Time Updates**: No page refreshes needed for order updates
+- **Scalable Architecture**: Modular component structure
+- **Type-Safe**: Mongoose schemas for data validation
+- **SEO Optimized**: Server-side rendering with Next.js
+- **Mobile Responsive**: Works seamlessly on all devices
+- **Performance**: Optimized images and lazy loading
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- Built with [Next.js](https://nextjs.org/)
+- UI components inspired by modern e-commerce platforms
+- Maps powered by [Leaflet](https://leafletjs.com/) and Google Maps
+- Real-time features powered by [Socket.io](https://socket.io/)
+
+---
+
+**Made with ❤️ for learning and demonstration purposes**
