@@ -250,7 +250,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+Copyright © 2025. All Rights Reserved.
+
+This project is proprietary and confidential. Unauthorized copying, distribution, modification, or use of this software, via any medium, is strictly prohibited without explicit written permission from the owner.
 
 ## 🙏 Acknowledgments
 
