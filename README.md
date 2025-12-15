@@ -138,7 +138,7 @@ Create a `.env.local` file in the root directory:
 
 ```env
 # MongoDB
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/grocery-delivery?retryWrites=true&w=majority
+MONGODB_URI=your-secret-key-here
 
 # NextAuth
 NEXTAUTH_SECRET=your-secret-key-here
