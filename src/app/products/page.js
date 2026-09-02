@@ -10,15 +10,17 @@ import FloatingCartBar from '@/components/cart/FloatingCartBar';
 import OrderTrackingModal from '@/components/orders/OrderTrackingModal';
 import Link from 'next/link';
 import { ChevronRight, TrendingUp, Percent, Package } from 'lucide-react';
+import useProductStore from '@/store/useProductStore';
 
 // Separate component for search params logic
 function ProductsContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { fetchCategories, fetchProducts } = useProductStore();
     const [categories, setCategories] = useState([]);
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [allProducts, setAllProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
 
@@ -53,33 +55,29 @@ function ProductsContent() {
         setTrackingOrderId(null);
     };
 
+    const fallbackProducts = [
+        { _id: 'p1', name: 'Fresh Organic Farm Tomatoes', price: 39, originalPrice: 50, weight: '500g', category: { name: 'Fresh Vegetables', slug: 'vegetables' }, rating: { average: 4.8 }, isFeatured: true, stock: 45, image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&q=80' },
+        { _id: 'p2', name: 'Fresh Red Shimla Apples', price: 149, originalPrice: 180, weight: '1 kg', category: { name: 'Fresh Fruits', slug: 'fruits' }, rating: { average: 4.9 }, isFeatured: true, stock: 30, image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400&q=80' },
+        { _id: 'p3', name: 'Pure Country Cow Milk', price: 62, originalPrice: 70, weight: '1 L', category: { name: 'Dairy & Eggs', slug: 'dairy' }, rating: { average: 4.8 }, isFeatured: true, stock: 50, image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&q=80' },
+        { _id: 'p4', name: 'Whole Wheat Artisan Bread', price: 45, originalPrice: 55, weight: '400g', category: { name: 'Bakery', slug: 'bakery' }, rating: { average: 4.6 }, isFeatured: true, stock: 30, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80' },
+        { _id: 'p5', name: 'Cold Pressed Orange Juice', price: 99, originalPrice: 120, weight: '500ml', category: { name: 'Beverages', slug: 'beverages' }, rating: { average: 4.8 }, isFeatured: true, stock: 20, image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400&q=80' },
+        { _id: 'p6', name: 'Roasted Salted Almonds', price: 299, originalPrice: 350, weight: '250g', category: { name: 'Snacks & Chips', slug: 'snacks' }, rating: { average: 4.9 }, isFeatured: true, stock: 40, image: 'https://images.unsplash.com/photo-1508061252966-17df56214578?w=400&q=80' },
+        { _id: 'p7', name: 'Organic Baby Spinach', price: 40, originalPrice: 50, weight: '250g', category: { name: 'Fresh Vegetables', slug: 'vegetables' }, rating: { average: 4.7 }, isFeatured: true, stock: 35, image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=80' },
+        { _id: 'p8', name: 'Fresh Cavendish Bananas', price: 55, originalPrice: 70, weight: '1 Dozen', category: { name: 'Fresh Fruits', slug: 'fruits' }, rating: { average: 4.8 }, isFeatured: true, stock: 60, image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&q=80' }
+    ];
+
     useEffect(() => {
-        fetchData();
+        const loadInstantProducts = async () => {
+            const cachedCats = await fetchCategories();
+            const cachedProds = await fetchProducts({ limit: 100 });
+            if (cachedCats?.length) setCategories(cachedCats);
+            const prodsToSet = cachedProds?.length ? cachedProds : fallbackProducts;
+            setAllProducts(prodsToSet);
+            setFeaturedProducts(prodsToSet.filter(p => p.isFeatured));
+        };
+
+        loadInstantProducts();
     }, []);
-
-    const fetchData = async () => {
-        try {
-            // Fetch categories
-            const categoriesRes = await fetch('/api/categories');
-            const categoriesData = await categoriesRes.json();
-            setCategories(categoriesData.categories || []);
-
-            // Fetch featured products (Today's Offers)
-            const featuredRes = await fetch('/api/products?featured=true&limit=8');
-            const featuredData = await featuredRes.json();
-            setFeaturedProducts(featuredData.products || []);
-
-            // Fetch all products
-            const allRes = await fetch('/api/products?limit=12');
-            const allData = await allRes.json();
-            setAllProducts(allData.products || []);
-
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            setLoading(false);
-        }
-    };
 
     if (loading) {
         return (
@@ -160,7 +158,7 @@ function ProductsContent() {
                         </div>
 
                         {featuredProducts.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
                                 {featuredProducts.map((product) => (
                                     <ProductCard key={product._id} product={product} onQuickView={handleQuickView} />
                                 ))}
@@ -187,7 +185,7 @@ function ProductsContent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
                             {allProducts.slice(0, 8).map((product) => (
                                 <ProductCard key={product._id} product={product} onQuickView={handleQuickView} />
                             ))}
@@ -208,7 +206,7 @@ function ProductsContent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
                             {allProducts.map((product) => (
                                 <ProductCard key={product._id} product={product} onQuickView={handleQuickView} />
                             ))}

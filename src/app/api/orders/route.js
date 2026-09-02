@@ -61,6 +61,8 @@ export async function POST(request) {
                 state: deliveryAddress.state,
                 zipCode: deliveryAddress.zipCode,
                 instructions: deliveryAddress.instructions || '',
+                latitude: deliveryAddress.latitude || deliveryAddress.lat || null,
+                longitude: deliveryAddress.longitude || deliveryAddress.lng || null,
             },
             paymentMethod: paymentMethod || 'COD',
             paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PENDING',

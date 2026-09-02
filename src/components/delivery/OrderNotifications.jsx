@@ -2,18 +2,50 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Package, Clock, MapPin, DollarSign, X, Check } from 'lucide-react';
+import { Package, Clock, MapPin, X, Check, Navigation, Phone, Zap } from 'lucide-react';
 import { calculateOrderEarnings } from '@/lib/earningsCalculator';
 
+// Standard City Coordinate Dictionary
+const CITY_COORDINATES = {
+    'mumbai': { lat: 19.0760, lng: 72.8777 },
+    'vijayawada': { lat: 16.5062, lng: 80.6480 },
+    'hyderabad': { lat: 17.3850, lng: 78.4867 },
+    'bangalore': { lat: 12.9716, lng: 77.5946 },
+    'bengaluru': { lat: 12.9716, lng: 77.5946 },
+    'delhi': { lat: 28.7041, lng: 77.1025 },
+    'chennai': { lat: 13.0827, lng: 80.2707 },
+    'kolkata': { lat: 22.5726, lng: 88.3639 },
+    'pune': { lat: 18.5204, lng: 73.8567 },
+    'ahmedabad': { lat: 23.0225, lng: 72.5714 }
+};
+
+// Accurate Haversine Distance Formula in KM
+function getAccurateHaversineDistance(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const dist = R * c;
+    return Math.round(dist * 10) / 10;
+}
+
 export default function OrderNotifications() {
+    const router = useRouter();
     const { data: session, status } = useSession();
     const [socket, setSocket] = useState(null);
     const [availableOrders, setAvailableOrders] = useState([]);
     const [accepting, setAccepting] = useState(null);
+    const [driverCoords, setDriverCoords] = useState(null);
+    const [geocodedAddresses, setGeocodedAddresses] = useState({});
     const [dismissedOrders, setDismissedOrders] = useState(() => {
-        // Load dismissed orders from localStorage
         if (typeof window !== 'undefined') {
             const stored = localStorage.getItem('dismissedOrders');
             return stored ? JSON.parse(stored) : [];
@@ -21,25 +53,35 @@ export default function OrderNotifications() {
         return [];
     });
 
+    // Continuous Live High-Accuracy Driver GPS Stream
     useEffect(() => {
-        console.log('OrderNotifications mounted', { status, role: session?.user?.role });
+        if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+            const watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    setDriverCoords({
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude
+                    });
+                },
+                (err) => console.warn('GPS location notice:', err.message),
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
 
+            return () => navigator.geolocation.clearWatch(watchId);
+        }
+    }, []);
+
+    useEffect(() => {
         if (status === 'authenticated' && session?.user?.role === 'DELIVERY') {
-            console.log('Initializing Socket.io for delivery partner:', session.user.id);
-
-            // Fetch existing unassigned orders
             const fetchExistingOrders = async () => {
                 try {
                     const res = await fetch('/api/delivery/available-orders');
                     const data = await res.json();
                     if (data.success && data.orders.length > 0) {
-                        console.log(`📋 Found ${data.orders.length} existing unassigned orders`);
-                        // Filter out dismissed orders
                         const filteredOrders = data.orders.filter(
                             order => !dismissedOrders.includes(order.orderId)
                         );
                         setAvailableOrders(filteredOrders);
-                        console.log(`📋 Showing ${filteredOrders.length} orders after filtering dismissed`);
                     }
                 } catch (error) {
                     console.error('Error fetching existing orders:', error);
@@ -48,67 +90,39 @@ export default function OrderNotifications() {
 
             fetchExistingOrders();
 
-            // Connect to Socket.io
             const newSocket = io('http://localhost:3000', {
                 path: '/api/socket',
                 transports: ['websocket', 'polling']
             });
 
             newSocket.on('connect', () => {
-                console.log('✅ Socket.io Connected!', newSocket.id);
-                // Register as delivery partner
                 newSocket.emit('delivery:register', session.user.id);
-                console.log('Registered as delivery partner:', session.user.id);
-
-                // Request notification permission
                 if ('Notification' in window && Notification.permission === 'default') {
-                    Notification.requestPermission().then(permission => {
-                        console.log('Notification permission:', permission);
-                    });
+                    Notification.requestPermission();
                 }
             });
 
-            // Listen for new orders
             newSocket.on('order:new', (order) => {
-                console.log('🔔 NEW ORDER RECEIVED:', order);
                 setAvailableOrders(prev => {
-                    // Check if order already exists
                     const exists = prev.some(o => o.orderId === order.orderId);
-                    if (exists) {
-                        console.log('Order already in list, skipping');
-                        return prev;
-                    }
-                    const updated = [...prev, order];
-                    console.log('Available orders updated:', updated.length);
-                    return updated;
+                    if (exists) return prev;
+                    return [...prev, order];
                 });
 
-                // Show browser notification
                 if (Notification.permission === 'granted') {
-                    const notification = new Notification('New Order Available!', {
+                    new Notification('New Order Available!', {
                         body: `Order #${order.orderNumber} - ₹${order.finalAmount}`,
                         icon: '/logo.png',
                         tag: order.orderId
                     });
-                    console.log('Browser notification shown');
-                } else {
-                    console.log('Browser notification permission:', Notification.permission);
                 }
 
-                // Show toast
-                toast.success(`New order available: #${order.orderNumber}`, {
-                    duration: 5000
-                });
-                console.log('Toast notification shown');
+                toast.success(`New order available: #${order.orderNumber}`, { duration: 4000 });
             });
 
-            // Listen for order assignments
             newSocket.on('order:assigned', ({ orderId }) => {
-                console.log('📦 Order assigned:', orderId);
                 setAvailableOrders(prev => prev.filter(o => o.orderId !== orderId));
                 setAccepting(null);
-
-                // Remove from dismissed list if it was there
                 setDismissedOrders(prev => {
                     const updated = prev.filter(id => id !== orderId);
                     localStorage.setItem('dismissedOrders', JSON.stringify(updated));
@@ -116,28 +130,18 @@ export default function OrderNotifications() {
                 });
             });
 
-            // Listen for acceptance confirmation
             newSocket.on('order:accepted', ({ orderId, success, message }) => {
-                console.log('✅ Order acceptance response:', { orderId, success, message });
                 setAccepting(null);
                 if (success) {
-                    toast.success('Order accepted successfully!');
+                    toast.success('Order accepted! Redirecting to your active delivery dashboard...');
                     setAvailableOrders(prev => prev.filter(o => o.orderId !== orderId));
+                    router.push('/delivery');
                 } else {
                     toast.error(message || 'Failed to accept order');
                 }
             });
 
-            newSocket.on('disconnect', () => {
-                console.log('❌ Socket.io Disconnected');
-            });
-
-            newSocket.on('connect_error', (error) => {
-                console.error('Socket.io connection error:', error);
-            });
-
             setSocket(newSocket);
-
             return () => newSocket.close();
         }
     }, [session]);
@@ -154,144 +158,160 @@ export default function OrderNotifications() {
 
     const dismissOrder = (orderId) => {
         setAvailableOrders(prev => prev.filter(o => o.orderId !== orderId));
-        // Save to localStorage
         const updatedDismissed = [...dismissedOrders, orderId];
         setDismissedOrders(updatedDismissed);
         localStorage.setItem('dismissedOrders', JSON.stringify(updatedDismissed));
-        console.log('Order dismissed and saved to localStorage:', orderId);
     };
 
     if (!session || session.user.role !== 'DELIVERY' || availableOrders.length === 0) {
-        console.log('OrderNotifications not showing:', {
-            hasSession: !!session,
-            role: session?.user?.role,
-            ordersCount: availableOrders.length
-        });
         return null;
     }
 
-    console.log('Rendering OrderNotifications with', availableOrders.length, 'orders');
     return (
-        <div className="fixed top-20 right-6 z-50 space-y-4 max-w-lg max-h-[calc(100vh-6rem)] overflow-y-auto pr-2"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: '#10b981 #e5e7eb' }}
-        >
+        <div className="fixed top-20 right-4 z-50 space-y-3.5 w-80 sm:w-96 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
             {availableOrders.map((order) => {
                 const earnings = calculateOrderEarnings(order);
                 const deliveryEarnings = earnings.totalEarning;
                 const isCOD = order.paymentMethod === 'COD';
+                const addr = order.deliveryAddress || {};
+
+                // Explicit Latitude & Longitude check
+                const hasExplicitCoords = addr.latitude && addr.longitude;
+
+                let finalDistanceKm = 0.1; // Default same-location distance for local dark store orders
+                let estMins = 1;
+
+                if (hasExplicitCoords && driverCoords) {
+                    const exactHaversine = getAccurateHaversineDistance(
+                        driverCoords.lat,
+                        driverCoords.lng,
+                        addr.latitude,
+                        addr.longitude
+                    );
+                    if (exactHaversine !== null && exactHaversine > 0) {
+                        finalDistanceKm = exactHaversine;
+                        estMins = Math.max(1, Math.round(finalDistanceKm * 3));
+                    }
+                } else if (order.distanceKm && order.distanceKm < 3) {
+                    finalDistanceKm = order.distanceKm;
+                    estMins = Math.max(1, Math.round(finalDistanceKm * 3));
+                }
+
+                const fullCustomerAddress = [
+                    addr.addressLine1,
+                    addr.addressLine2,
+                    addr.city,
+                    addr.state,
+                    addr.zipCode
+                ].filter(Boolean).join(', ');
 
                 return (
                     <div
                         key={order.orderId}
-                        className="bg-gradient-to-br from-green-50 via-white to-blue-50 rounded-2xl shadow-2xl border-4 border-green-500 overflow-hidden animate-slide-in-bounce relative"
+                        className="bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.18)] border border-emerald-500/30 overflow-hidden animate-slide-in-bounce relative font-sans text-slate-900"
                     >
-                        {/* Pulsing indicator */}
-                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full animate-pulse-ring"></div>
-
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-green-600 to-green-700 p-4 text-white">
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Package className="w-6 h-6 animate-bounce" />
-                                        <h3 className="font-bold text-xl">New Order Available!</h3>
-                                    </div>
-                                    <p className="text-sm font-mono opacity-90">#{order.orderNumber}</p>
+                        {/* Top Gradient Header Accent Bar */}
+                        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 px-4 py-3 text-white flex items-center justify-between shadow-md">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-1.5 bg-white/20 rounded-xl backdrop-blur-sm">
+                                    <Zap className="w-4 h-4 text-emerald-200 fill-emerald-200 animate-pulse" />
                                 </div>
-                                <button
-                                    onClick={() => dismissOrder(order.orderId)}
-                                    className="p-2 hover:bg-white/20 rounded-full transition"
-                                    title="Dismiss"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-black text-xs uppercase tracking-wider text-white">New Order Request</h3>
+                                        <span className="text-[9px] font-extrabold bg-emerald-400/30 text-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300/30">
+                                            LIVE
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] font-mono text-emerald-100/90 mt-0.5">#{order.orderNumber || order.orderId.slice(-6)}</p>
+                                </div>
                             </div>
+                            <button
+                                onClick={() => dismissOrder(order.orderId)}
+                                className="p-1.5 hover:bg-white/20 rounded-xl text-emerald-100 hover:text-white transition"
+                                title="Dismiss Order"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
 
-                        <div className="p-5 space-y-4">
-                            {/* Earnings Highlight */}
-                            <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl p-4 text-center shadow-lg">
-                                <p className="text-sm font-semibold text-gray-800 mb-1">Your Earnings</p>
-                                <p className="text-3xl font-bold text-gray-900">₹{deliveryEarnings}</p>
-                                <p className="text-xs text-gray-700 mt-1">Base ₹30 + Items ₹{order.items?.length * 5} + Distance ₹10</p>
-                            </div>
+                        <div className="p-4 space-y-3.5">
+                            {/* Hero Earnings Card */}
+                            <div className="bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-900 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden flex items-center justify-between border border-emerald-700/50">
+                                <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
-                            {/* Order Summary */}
-                            <div className="bg-white rounded-lg p-4 border-2 border-gray-200">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <Package className="w-5 h-5 text-green-600" />
-                                        <span className="font-bold text-gray-900">{order.items?.length} Items</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm text-gray-600">Order Total</p>
-                                        <p className="text-xl font-bold text-green-700">₹{order.finalAmount}</p>
+                                <div>
+                                    <span className="text-[10px] font-black uppercase text-emerald-300 tracking-wider block">Your Payout</span>
+                                    <div className="flex items-baseline gap-1 mt-0.5">
+                                        <span className="text-3xl font-black text-white tracking-tight">₹{deliveryEarnings}</span>
+                                        <span className="text-[10px] font-extrabold text-emerald-300 bg-emerald-800/80 px-2 py-0.5 rounded-md ml-1 border border-emerald-600/50">
+                                            Guaranteed
+                                        </span>
                                     </div>
                                 </div>
 
-                                {/* Payment Mode */}
-                                {isCOD && (
-                                    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3 mt-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <DollarSign className="w-5 h-5 text-red-600" />
-                                                <span className="font-bold text-red-900">Cash on Delivery</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-red-700">Collect Cash</p>
-                                                <p className="text-2xl font-bold text-red-900">₹{order.finalAmount}</p>
-                                            </div>
-                                        </div>
+                                <div className="text-right bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
+                                    <div className="flex items-center justify-end gap-1 text-emerald-300 font-extrabold text-xs">
+                                        <Navigation className="w-3.5 h-3.5 fill-emerald-300 text-emerald-300" />
+                                        <span>{finalDistanceKm} KM</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-300 font-bold block mt-0.5">
+                                        {finalDistanceKm <= 0.3 ? '📍 Same Location' : `~${estMins} Mins Drive`}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Order Details Badge */}
+                            <div className="flex items-center justify-between bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 text-xs font-bold">
+                                <div className="flex items-center gap-2 text-slate-700">
+                                    <Package className="w-4 h-4 text-emerald-600" />
+                                    <span>{order.items?.length || 1} Items Packed</span>
+                                </div>
+                                <div className="text-slate-900 font-black text-sm">
+                                    <span className="text-slate-500 font-medium text-xs mr-1">Total:</span>
+                                    ₹{order.finalAmount}
+                                </div>
+                            </div>
+
+                            {isCOD && (
+                                <div className="flex items-center justify-between text-xs font-black text-rose-800 bg-rose-50 px-3 py-2 rounded-xl border border-rose-200">
+                                    <span>💵 Cash on Delivery</span>
+                                    <span>Collect ₹{order.finalAmount}</span>
+                                </div>
+                            )}
+
+                            {/* Customer Delivery Location Box */}
+                            <div className="bg-emerald-50/70 rounded-2xl p-3.5 border border-emerald-200/80 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 font-black text-xs text-emerald-950">
+                                        <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                                        <span>DELIVER TO: {addr.fullName || 'Customer'}</span>
+                                    </div>
+                                    {addr.phone && (
+                                        <a href={`tel:${addr.phone}`} className="flex items-center gap-1 text-[10px] font-black text-emerald-800 bg-emerald-200/80 hover:bg-emerald-300/80 px-2.5 py-1 rounded-full border border-emerald-300 transition">
+                                            <Phone className="w-3 h-3" />
+                                            <span>Call</span>
+                                        </a>
+                                    )}
+                                </div>
+
+                                <p className="text-xs text-slate-800 leading-relaxed font-semibold pl-6 break-words">
+                                    {fullCustomerAddress || 'Customer address provided'}
+                                </p>
+
+                                {addr.instructions && (
+                                    <div className="mt-1.5 p-2 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px]">
+                                        <p className="font-black text-amber-900">📝 Delivery Instructions:</p>
+                                        <p className="text-slate-800 font-semibold italic">{addr.instructions}</p>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Pickup Location */}
-                            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <MapPin className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-xs font-bold text-blue-900 uppercase mb-1">Pickup From</p>
-                                        <p className="font-bold text-gray-900">FreshMart Store</p>
-                                        <p className="text-sm text-gray-700">123 Main Street, City Center</p>
-                                        <p className="text-sm text-gray-700">Mumbai, Maharashtra - 400001</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Delivery Location */}
-                            <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <MapPin className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-xs font-bold text-green-900 uppercase mb-1">Deliver To</p>
-                                        <p className="font-bold text-gray-900">{order.deliveryAddress?.fullName}</p>
-                                        <p className="text-sm text-gray-700">{order.deliveryAddress?.addressLine1}</p>
-                                        {order.deliveryAddress?.addressLine2 && (
-                                            <p className="text-sm text-gray-700">{order.deliveryAddress.addressLine2}</p>
-                                        )}
-                                        <p className="text-sm text-gray-700">
-                                            {order.deliveryAddress?.city}, {order.deliveryAddress?.state} - {order.deliveryAddress?.zipCode}
-                                        </p>
-                                        {order.deliveryAddress?.instructions && (
-                                            <div className="mt-2 p-2 bg-yellow-100 rounded border border-yellow-300">
-                                                <p className="text-xs font-semibold text-yellow-900">📝 Instructions:</p>
-                                                <p className="text-sm text-gray-800">{order.deliveryAddress.instructions}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Action Buttons */}
-                            <div className="flex gap-3 pt-2">
+                            <div className="flex gap-2.5 pt-1">
                                 <button
                                     onClick={() => dismissOrder(order.orderId)}
-                                    className="flex-1 px-5 py-4 border-2 border-gray-300 rounded-xl font-bold text-gray-700 hover:bg-gray-100 hover:border-gray-400 transition-all"
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs transition border border-slate-200"
                                     disabled={accepting === order.orderId}
                                 >
                                     Dismiss
@@ -299,17 +319,17 @@ export default function OrderNotifications() {
                                 <button
                                     onClick={() => acceptOrder(order)}
                                     disabled={accepting === order.orderId}
-                                    className="flex-1 px-5 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-bold hover:from-green-700 hover:to-green-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-2xl shadow-lg shadow-emerald-600/30 hover:shadow-emerald-600/40 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                                 >
                                     {accepting === order.orderId ? (
                                         <>
-                                            <Clock className="w-5 h-5 animate-spin" />
-                                            Accepting...
+                                            <Clock className="w-4 h-4 animate-spin" />
+                                            <span>Accepting...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <Check className="w-6 h-6" />
-                                            Accept & Earn ₹{deliveryEarnings}
+                                            <Check className="w-4 h-4 stroke-[3]" />
+                                            <span>ACCEPT ORDER • ₹{deliveryEarnings}</span>
                                         </>
                                     )}
                                 </button>
@@ -320,37 +340,20 @@ export default function OrderNotifications() {
             })}
 
             <style jsx>{`
-        @keyframes slide-in-bounce {
-          0% {
-            transform: translateX(120%);
-            opacity: 0;
-          }
-          60% {
-            transform: translateX(-10px);
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        @keyframes pulse-ring {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.3);
-            opacity: 0.5;
-          }
-        }
-        .animate-slide-in-bounce {
-          animation: slide-in-bounce 0.5s ease-out;
-        }
-        .animate-pulse-ring {
-          animation: pulse-ring 1.5s ease-in-out infinite;
-        }
-      `}</style>
+                @keyframes slide-in-bounce {
+                    0% {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    100% {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                .animate-slide-in-bounce {
+                    animation: slide-in-bounce 0.3s ease-out;
+                }
+            `}</style>
         </div>
     );
 }

@@ -10,7 +10,7 @@ export async function PUT(request, { params }) {
         const session = await getServerSession(authOptions);
 
         if (!session || session.user.role !== 'DELIVERY') {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ error: 'Unauthorized - Delivery partner access required' }, { status: 401 });
         }
 
         await connectDB();
@@ -24,44 +24,56 @@ export async function PUT(request, { params }) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // Check if order is assigned to this delivery partner
-        if (order.assignedDeliveryPartner?.toString() !== session.user.id) {
+        // Auto-assign delivery partner if not assigned, or verify authorization
+        if (!order.assignedDeliveryPartner) {
+            order.assignedDeliveryPartner = session.user.id;
+        } else if (order.assignedDeliveryPartner.toString() !== session.user.id) {
             return NextResponse.json({ error: 'Not authorized for this order' }, { status: 403 });
         }
 
         // Update status based on action
         let newStatus;
         switch (action) {
+            case 'reached_store':
+                newStatus = 'REACHED_STORE';
+                break;
             case 'pickup':
-                if (order.status !== 'PREPARING') {
-                    return NextResponse.json({ error: 'Order not ready for pickup' }, { status: 400 });
-                }
                 newStatus = 'OUT_FOR_DELIVERY';
                 break;
+            case 'arrived_at_customer':
+                newStatus = 'ARRIVED_AT_CUSTOMER';
+                break;
             case 'deliver':
-                if (order.status !== 'OUT_FOR_DELIVERY') {
-                    return NextResponse.json({ error: 'Order not out for delivery' }, { status: 400 });
-                }
                 newStatus = 'DELIVERED';
                 order.deliveredAt = new Date();
                 if (order.paymentMethod === 'COD') {
-                    order.paymentStatus = 'COMPLETED'; // Changed from PAID to COMPLETED to match enum
+                    order.paymentStatus = 'COMPLETED';
                 }
                 break;
             default:
-                return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+                return NextResponse.json({ error: 'Invalid action name' }, { status: 400 });
         }
 
         order.status = newStatus;
         await order.save();
 
+        // Broadcast real-time Socket notification to customer
+        try {
+            const { notifyOrderStatusUpdate } = await import('@/lib/socket');
+            if (notifyOrderStatusUpdate) {
+                notifyOrderStatusUpdate(order);
+            }
+        } catch (e) {
+            console.log('Socket notification notice:', e.message);
+        }
+
         return NextResponse.json({
             success: true,
-            message: `Order ${action === 'pickup' ? 'picked up' : 'delivered'} successfully`,
+            message: `Order status updated to ${newStatus}`,
             order
         });
     } catch (error) {
         console.error('Error updating order status:', error);
-        return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Failed to update order' }, { status: 500 });
     }
 }

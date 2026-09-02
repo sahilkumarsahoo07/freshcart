@@ -205,7 +205,7 @@ export default function OrderDetailPage({ params }) {
     if (!order) return null;
 
     const showMap = order.assignedDeliveryPartner &&
-        (order.status === 'OUT_FOR_DELIVERY' || order.status === 'PREPARING');
+        (order.status === 'OUT_FOR_DELIVERY' || order.status === 'PREPARING' || order.status === 'REACHED_STORE' || order.status === 'ARRIVED_AT_CUSTOMER');
 
     const storeLocation = [19.076, 72.8777];
     const customerLocation = order.deliveryAddress?.latitude && order.deliveryAddress?.longitude

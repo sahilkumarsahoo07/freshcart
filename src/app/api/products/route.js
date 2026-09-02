@@ -3,11 +3,29 @@ import connectDB from '@/lib/mongodb';
 import Product from '@/models/Product';
 import Category from '@/models/Category';
 
+// In-Memory product query cache
+const productCache = new Map();
+const CACHE_TTL = 30 * 1000; // 30 seconds
+
 export async function GET(request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const cacheKey = searchParams.toString();
+        const now = Date.now();
+
+        if (productCache.has(cacheKey)) {
+            const cached = productCache.get(cacheKey);
+            if (now - cached.timestamp < CACHE_TTL) {
+                return NextResponse.json(cached.data, {
+                    headers: {
+                        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+                    }
+                });
+            }
+        }
+
         await connectDB();
 
-        const { searchParams } = new URL(request.url);
         const category = searchParams.get('category');
         const featured = searchParams.get('featured');
         const search = searchParams.get('search');
@@ -19,7 +37,7 @@ export async function GET(request) {
 
         // Filter by category
         if (category) {
-            const categoryDoc = await Category.findOne({ slug: category });
+            const categoryDoc = await Category.findOne({ slug: category }).lean();
             if (categoryDoc) {
                 query.category = categoryDoc._id;
             }
@@ -39,21 +57,17 @@ export async function GET(request) {
             ];
         }
 
-        const products = await Product.find(query)
-            .populate('category', 'name slug icon')
-            .limit(limit)
-            .skip(skip)
-            .sort({ createdAt: -1 });
+        const [products, total] = await Promise.all([
+            Product.find(query)
+                .populate('category', 'name slug icon')
+                .limit(limit)
+                .skip(skip)
+                .sort({ createdAt: -1 })
+                .lean(),
+            Product.countDocuments(query)
+        ]);
 
-        console.log('Products query:', JSON.stringify(query));
-        console.log('Found products:', products.length);
-        if (featured === 'true') {
-            console.log('Featured products:', products.map(p => ({ name: p.name, isFeatured: p.isFeatured })));
-        }
-
-        const total = await Product.countDocuments(query);
-
-        return NextResponse.json({
+        const responseData = {
             products,
             pagination: {
                 total,
@@ -61,6 +75,15 @@ export async function GET(request) {
                 limit,
                 pages: Math.ceil(total / limit),
             },
+        };
+
+        // Cache response
+        productCache.set(cacheKey, { timestamp: now, data: responseData });
+
+        return NextResponse.json(responseData, {
+            headers: {
+                'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+            }
         });
     } catch (error) {
         console.error('Products API error:', error);

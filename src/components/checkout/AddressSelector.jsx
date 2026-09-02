@@ -1,9 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { MapPin, Plus, Edit2, Trash2, Star, X, Loader, Home, Briefcase, MapPinned, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
-import AddressMap from './AddressMap';
+
+const AddressMap = dynamic(() => import('./AddressMap'), {
+    ssr: false,
+    loading: () => (
+        <div className="h-96 w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-500 font-semibold">
+            Loading Map...
+        </div>
+    )
+});
 
 export default function AddressSelector({ onAddressSelect, selectedAddressId }) {
     const [addresses, setAddresses] = useState([]);

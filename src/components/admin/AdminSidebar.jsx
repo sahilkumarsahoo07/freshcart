@@ -5,6 +5,10 @@ import { usePathname } from 'next/navigation';
 import {
     LayoutDashboard,
     Package,
+    Grid,
+    Tag,
+    Utensils,
+    Image as ImageIcon,
     Users,
     Truck,
     ShoppingCart,
@@ -21,7 +25,11 @@ export default function AdminSidebar() {
 
     const navItems = [
         { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+        { name: 'Categories', href: '/admin/categories', icon: Grid },
         { name: 'Products', href: '/admin/products', icon: Package },
+        { name: 'Coupons & Promos', href: '/admin/coupons', icon: Tag },
+        { name: 'Recipe Kits', href: '/admin/recipes', icon: Utensils },
+        { name: 'Hero Banners', href: '/admin/banners', icon: ImageIcon },
         { name: 'Users', href: '/admin/users', icon: Users },
         { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
         { name: 'Delivery Partners', href: '/admin/delivery-partners', icon: Truck },

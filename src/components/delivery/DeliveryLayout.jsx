@@ -70,7 +70,7 @@ export default function DeliveryLayout({ children, session }) {
 
             <div className="flex">
                 {/* Sidebar - Desktop */}
-                <aside className="hidden lg:block w-64 bg-white shadow-md min-h-screen">
+                <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto shrink-0">
                     <nav className="p-4 space-y-2">
                         {navigation.map((item) => {
                             const isActive = pathname === item.href;

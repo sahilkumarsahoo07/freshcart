@@ -70,7 +70,7 @@ const OrderSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['PLACED', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
+            enum: ['PLACED', 'CONFIRMED', 'PREPARING', 'REACHED_STORE', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'DELIVERED', 'CANCELLED'],
             default: 'PLACED',
         },
         assignedDeliveryPartner: {
@@ -136,4 +136,5 @@ const OrderSchema = new mongoose.Schema(
     }
 );
 
+delete mongoose.models.Order;
 export default mongoose.models.Order || mongoose.model('Order', OrderSchema);
