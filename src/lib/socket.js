@@ -168,7 +168,6 @@ export const notifyOrderStatusUpdate = (order) => {
         try {
             ioInstance = getIO();
         } catch (error) {
-            console.log('⚠️ Socket.io not initialized, cannot notify order status update');
             return;
         }
 
@@ -201,7 +200,6 @@ export const notifyOrderCreated = (order) => {
         try {
             ioInstance = getIO();
         } catch (error) {
-            console.log('⚠️ Socket.io not initialized, cannot notify order creation');
             return;
         }
 
@@ -228,7 +226,6 @@ export const updateDeliveryLocation = (orderId, locationData) => {
         try {
             ioInstance = getIO();
         } catch (error) {
-            console.log('⚠️ Socket.io not initialized, cannot update delivery location');
             return;
         }
 

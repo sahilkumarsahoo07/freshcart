@@ -1,61 +1,55 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 export default function LocationTracker({ orderId, onLocationUpdate }) {
-    const [currentLocation, setCurrentLocation] = useState(null);
-    const watchIdRef = useRef(null);
-    const updateIntervalRef = useRef(null);
+    const currentLocationRef = useRef(null);
 
     useEffect(() => {
-        if (orderId) {
-            startTracking();
+        if (!orderId) return;
+
+        // Default Dark Store origin fallback (Vijayawada central hub)
+        const defaultLocation = { latitude: 16.5030, longitude: 80.6400 };
+        currentLocationRef.current = defaultLocation;
+
+        // Immediately send initial location so backend has record
+        sendLocationUpdate(defaultLocation);
+
+        let watchId = null;
+
+        if (navigator.geolocation) {
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const loc = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                    };
+                    currentLocationRef.current = loc;
+                    sendLocationUpdate(loc);
+                },
+                (err) => {
+                    console.warn('Rider GPS notice:', err.message);
+                    // Send default hub location if browser GPS fails/denied
+                    sendLocationUpdate(defaultLocation);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
+
+        // Heartbeat timer every 5s to guarantee continuous backend sync
+        const intervalId = setInterval(() => {
+            if (currentLocationRef.current) {
+                sendLocationUpdate(currentLocationRef.current);
+            }
+        }, 5000);
 
         return () => {
-            stopTracking();
+            if (watchId !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            clearInterval(intervalId);
         };
     }, [orderId]);
-
-    const startTracking = () => {
-        if (!navigator.geolocation) return;
-
-        watchIdRef.current = navigator.geolocation.watchPosition(
-            (position) => {
-                const location = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                };
-                setCurrentLocation(location);
-            },
-            (err) => {
-                console.warn('GPS location notice:', err.message);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
-            }
-        );
-
-        updateIntervalRef.current = setInterval(() => {
-            if (currentLocation) {
-                sendLocationUpdate(currentLocation);
-            }
-        }, 15000);
-    };
-
-    const stopTracking = () => {
-        if (watchIdRef.current) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-        }
-
-        if (updateIntervalRef.current) {
-            clearInterval(updateIntervalRef.current);
-            updateIntervalRef.current = null;
-        }
-    };
 
     const sendLocationUpdate = async (location) => {
         try {
@@ -74,16 +68,9 @@ export default function LocationTracker({ orderId, onLocationUpdate }) {
                 if (onLocationUpdate) onLocationUpdate(data.tracking);
             }
         } catch (error) {
-            console.error('Error updating location:', error);
+            console.error('Error sending rider location update:', error);
         }
     };
 
-    useEffect(() => {
-        if (currentLocation) {
-            sendLocationUpdate(currentLocation);
-        }
-    }, [currentLocation]);
-
-    // Pure background tracker - zero UI footprint to prevent card clutter
     return null;
 }

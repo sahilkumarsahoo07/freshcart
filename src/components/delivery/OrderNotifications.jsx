@@ -87,62 +87,38 @@ export default function OrderNotifications() {
                     console.error('Error fetching existing orders:', error);
                 }
             };
-
             fetchExistingOrders();
 
-            const newSocket = io('http://localhost:3000', {
-                path: '/api/socket',
-                transports: ['websocket', 'polling']
-            });
-
-            newSocket.on('connect', () => {
-                newSocket.emit('delivery:register', session.user.id);
-                if ('Notification' in window && Notification.permission === 'default') {
-                    Notification.requestPermission();
-                }
-            });
-
-            newSocket.on('order:new', (order) => {
-                setAvailableOrders(prev => {
-                    const exists = prev.some(o => o.orderId === order.orderId);
-                    if (exists) return prev;
-                    return [...prev, order];
-                });
-
-                if (Notification.permission === 'granted') {
-                    new Notification('New Order Available!', {
-                        body: `Order #${order.orderNumber} - ₹${order.finalAmount}`,
-                        icon: '/logo.png',
-                        tag: order.orderId
+            if (process.env.NEXT_PUBLIC_SOCKET_ENABLED === 'true') {
+                try {
+                    const newSocket = io(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000', {
+                        path: '/api/socket',
+                        reconnectionAttempts: 2,
+                        timeout: 5000,
                     });
+
+                    newSocket.on('connect', () => {
+                        newSocket.emit('delivery:register', session.user.id);
+                    });
+
+                    newSocket.on('order:new', (order) => {
+                        setAvailableOrders(prev => {
+                            const exists = prev.some(o => o.orderId === order.orderId);
+                            if (exists) return prev;
+                            return [...prev, order];
+                        });
+                    });
+
+                    newSocket.on('order:assigned', ({ orderId }) => {
+                        setAvailableOrders(prev => prev.filter(o => o.orderId !== orderId));
+                    });
+
+                    setSocket(newSocket);
+                    return () => newSocket.close();
+                } catch (e) {
+                    console.warn('OrderNotifications socket notice:', e.message);
                 }
-
-                toast.success(`New order available: #${order.orderNumber}`, { duration: 4000 });
-            });
-
-            newSocket.on('order:assigned', ({ orderId }) => {
-                setAvailableOrders(prev => prev.filter(o => o.orderId !== orderId));
-                setAccepting(null);
-                setDismissedOrders(prev => {
-                    const updated = prev.filter(id => id !== orderId);
-                    localStorage.setItem('dismissedOrders', JSON.stringify(updated));
-                    return updated;
-                });
-            });
-
-            newSocket.on('order:accepted', ({ orderId, success, message }) => {
-                setAccepting(null);
-                if (success) {
-                    toast.success('Order accepted! Redirecting to your active delivery dashboard...');
-                    setAvailableOrders(prev => prev.filter(o => o.orderId !== orderId));
-                    router.push('/delivery');
-                } else {
-                    toast.error(message || 'Failed to accept order');
-                }
-            });
-
-            setSocket(newSocket);
-            return () => newSocket.close();
+            }
         }
     }, [session]);
 

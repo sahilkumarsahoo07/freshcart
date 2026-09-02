@@ -85,9 +85,9 @@ export async function POST(request) {
                 timestamp: new Date(),
             });
 
-            // Calculate distance to customer (simple Haversine formula)
-            const customerLat = order.deliveryAddress?.latitude || 19.0760;
-            const customerLng = order.deliveryAddress?.longitude || 72.8777;
+            // Calculate distance to customer
+            const customerLat = order.deliveryAddress?.latitude || 16.5062;
+            const customerLng = order.deliveryAddress?.longitude || 80.6480;
             const distance = calculateDistance(latitude, longitude, customerLat, customerLng);
             tracking.distanceRemaining = distance;
 
@@ -106,8 +106,8 @@ export async function POST(request) {
             await tracking.save();
         } else {
             // Create new tracking record
-            const customerLat = order.deliveryAddress?.latitude || 19.0760;
-            const customerLng = order.deliveryAddress?.longitude || 72.8777;
+            const customerLat = order.deliveryAddress?.latitude || 16.5062;
+            const customerLng = order.deliveryAddress?.longitude || 80.6480;
             const distance = calculateDistance(latitude, longitude, customerLat, customerLng);
             const hoursRemaining = distance / 20;
             const minutesRemaining = Math.ceil(hoursRemaining * 60);

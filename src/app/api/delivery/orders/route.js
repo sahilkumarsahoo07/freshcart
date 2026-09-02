@@ -4,7 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import connectDB from '@/lib/mongodb';
 import Order from '@/models/Order';
 
-// GET - Get delivery partner's assigned orders
+// GET - Get delivery partner's assigned & active available orders
 export async function GET(request) {
     try {
         const session = await getServerSession(authOptions);
@@ -16,12 +16,23 @@ export async function GET(request) {
         await connectDB();
 
         const { searchParams } = new URL(request.url);
-        const status = searchParams.get('status');
+        const statusParam = searchParams.get('status');
 
-        let query = { assignedDeliveryPartner: session.user.id };
+        let query;
 
-        if (status) {
-            query.status = status;
+        if (statusParam) {
+            query = { assignedDeliveryPartner: session.user.id, status: statusParam };
+        } else {
+            // Show both assigned orders AND unassigned active orders needing delivery
+            query = {
+                $or: [
+                    { assignedDeliveryPartner: session.user.id },
+                    {
+                        assignedDeliveryPartner: null,
+                        status: { $in: ['PLACED', 'CONFIRMED', 'PREPARING', 'REACHED_STORE', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER'] }
+                    }
+                ]
+            };
         }
 
         const orders = await Order.find(query)
@@ -29,11 +40,11 @@ export async function GET(request) {
             .sort({ createdAt: -1 })
             .limit(50);
 
-        // Get stats
+        // Get stats for this partner
         const stats = {
             total: await Order.countDocuments({ assignedDeliveryPartner: session.user.id }),
-            pending: await Order.countDocuments({ assignedDeliveryPartner: session.user.id, status: { $in: ['CONFIRMED', 'PREPARING'] } }),
-            active: await Order.countDocuments({ assignedDeliveryPartner: session.user.id, status: 'OUT_FOR_DELIVERY' }),
+            pending: await Order.countDocuments({ assignedDeliveryPartner: session.user.id, status: { $in: ['CONFIRMED', 'PREPARING', 'REACHED_STORE'] } }),
+            active: await Order.countDocuments({ assignedDeliveryPartner: session.user.id, status: { $in: ['OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER'] } }),
             completed: await Order.countDocuments({ assignedDeliveryPartner: session.user.id, status: 'DELIVERED' }),
         };
 

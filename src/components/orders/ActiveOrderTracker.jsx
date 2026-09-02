@@ -1,11 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
-import Image from 'next/image';
 import { Package, Truck, Clock, MapPin, Phone, X, ChevronRight, RefreshCw } from 'lucide-react';
-import { io } from 'socket.io-client';
 
 export default function ActiveOrderPopup() {
     const router = useRouter();
@@ -14,48 +12,10 @@ export default function ActiveOrderPopup() {
     const [activeOrders, setActiveOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
-    const socketRef = useRef(null);
 
     useEffect(() => {
         if (status === 'authenticated' && session?.user?.id) {
-            // Initial fetch
             fetchActiveOrders();
-
-            // Initialize Socket.io connection
-            const socket = io({
-                path: '/api/socket',
-            });
-
-            socketRef.current = socket;
-
-            socket.on('connect', () => {
-                console.log('✅ ActiveOrderTracker connected to socket');
-                // Register user for order updates
-                socket.emit('user:register', session.user.id);
-            });
-
-            // Listen for order status updates
-            socket.on('order:statusUpdated', (data) => {
-                console.log('📦 Order status updated:', data);
-                // Refresh active orders when any order status changes
-                fetchActiveOrders();
-            });
-
-            // Listen for new orders (in case user places a new order)
-            socket.on('order:created', (data) => {
-                console.log('🆕 New order created:', data);
-                if (data.userId === session.user.id) {
-                    fetchActiveOrders();
-                }
-            });
-
-            socket.on('disconnect', () => {
-                console.log('❌ ActiveOrderTracker disconnected from socket');
-            });
-
-            return () => {
-                socket.disconnect();
-            };
         }
     }, [status, session?.user?.id]);
 
@@ -99,12 +59,12 @@ export default function ActiveOrderPopup() {
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all hover:scale-110 p-4 flex items-center gap-3 animate-bounce"
+                    className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all hover:scale-105 p-3.5 flex items-center gap-3 animate-bounce"
                 >
-                    <Package className="w-6 h-6" />
-                    <span className="font-bold pr-2">{activeOrders.length} Active Order{activeOrders.length > 1 ? 's' : ''}</span>
+                    <Package className="w-5 h-5" />
+                    <span className="font-extrabold text-xs pr-1">{activeOrders.length} Active Order{activeOrders.length > 1 ? 's' : ''}</span>
                     {activeOrders.some(o => o.status === 'OUT_FOR_DELIVERY') && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full animate-ping"></div>
                     )}
                 </button>
             )}
@@ -121,33 +81,33 @@ export default function ActiveOrderPopup() {
                     {/* Popup Content */}
                     <div className="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden animate-slide-up">
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 flex items-center justify-between">
+                        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-5 flex items-center justify-between">
                             <div>
-                                <h2 className="text-2xl font-bold flex items-center gap-2">
-                                    <Package className="w-7 h-7" />
+                                <h2 className="text-xl font-black flex items-center gap-2">
+                                    <Package className="w-6 h-6" />
                                     Active Orders
                                 </h2>
-                                <p className="text-sm opacity-90 mt-1">{activeOrders.length} order{activeOrders.length > 1 ? 's' : ''} in progress</p>
+                                <p className="text-xs opacity-90 mt-0.5">{activeOrders.length} order{activeOrders.length > 1 ? 's' : ''} in progress</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={fetchActiveOrders}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition"
+                                    className="p-2 hover:bg-white/20 rounded-xl transition"
                                     title="Refresh"
                                 >
-                                    <RefreshCw className="w-5 h-5" />
+                                    <RefreshCw className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => setIsOpen(false)}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition"
+                                    className="p-2 hover:bg-white/20 rounded-xl transition"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
 
                         {/* Orders List */}
-                        <div className="overflow-y-auto max-h-[calc(80vh-120px)] p-4 space-y-4">
+                        <div className="overflow-y-auto max-h-[calc(80vh-120px)] p-4 space-y-3">
                             {activeOrders.map((order) => {
                                 const statusInfo = getStatusInfo(order.status);
                                 const StatusIcon = statusInfo.icon;
@@ -159,31 +119,31 @@ export default function ActiveOrderPopup() {
                                             setIsOpen(false);
                                             router.push(`/my-orders/${order._id}`);
                                         }}
-                                        className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border-2 border-gray-200 hover:border-green-500 hover:shadow-lg transition-all cursor-pointer"
+                                        className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all cursor-pointer space-y-3"
                                     >
                                         {/* Order Header */}
-                                        <div className="flex items-start justify-between mb-4">
+                                        <div className="flex items-start justify-between">
                                             <div>
-                                                <p className="font-bold text-gray-900 text-lg">#{order.orderNumber}</p>
-                                                <p className="text-sm text-gray-600">{order.items?.length} items • ₹{order.finalAmount}</p>
+                                                <p className="font-black text-slate-900 text-base">#{order.orderNumber}</p>
+                                                <p className="text-xs text-slate-500 font-medium">{order.items?.length} items • ₹{order.finalAmount}</p>
                                             </div>
-                                            <ChevronRight className="w-6 h-6 text-gray-400" />
+                                            <ChevronRight className="w-5 h-5 text-slate-400" />
                                         </div>
 
                                         {/* Status Progress */}
-                                        <div className="mb-4">
-                                            <div className="flex items-center justify-between mb-2">
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between text-xs">
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`p-1.5 rounded-full ${statusInfo.color}`}>
-                                                        <StatusIcon className="w-4 h-4 text-white" />
+                                                    <div className={`p-1 rounded-full ${statusInfo.color}`}>
+                                                        <StatusIcon className="w-3.5 h-3.5 text-white" />
                                                     </div>
-                                                    <span className="font-semibold text-gray-900">{statusInfo.text}</span>
+                                                    <span className="font-extrabold text-slate-900">{statusInfo.text}</span>
                                                 </div>
-                                                <span className="text-sm text-gray-600">{statusInfo.progress}%</span>
+                                                <span className="font-mono font-bold text-slate-500">{statusInfo.progress}%</span>
                                             </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div className="w-full bg-slate-200 rounded-full h-2">
                                                 <div
-                                                    className={`h-2.5 rounded-full ${statusInfo.color} transition-all duration-500`}
+                                                    className={`h-2 rounded-full ${statusInfo.color} transition-all duration-500`}
                                                     style={{ width: `${statusInfo.progress}%` }}
                                                 ></div>
                                             </div>
@@ -191,39 +151,39 @@ export default function ActiveOrderPopup() {
 
                                         {/* Delivery Partner */}
                                         {order.assignedDeliveryPartner && (
-                                            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg mb-3">
-                                                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                                            <div className="flex items-center gap-3 p-2.5 bg-emerald-50/80 rounded-xl border border-emerald-100">
+                                                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-black text-xs">
                                                     {order.assignedDeliveryPartner.name?.[0]?.toUpperCase()}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <p className="font-semibold text-gray-900 text-sm">{order.assignedDeliveryPartner.name}</p>
-                                                    <p className="text-xs text-gray-600">Delivery Partner</p>
+                                                    <p className="font-extrabold text-slate-900 text-xs">{order.assignedDeliveryPartner.name}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium">Assigned Delivery Partner</p>
                                                 </div>
                                                 {order.assignedDeliveryPartner.phone && order.status === 'OUT_FOR_DELIVERY' && (
                                                     <a
                                                         href={`tel:${order.assignedDeliveryPartner.phone}`}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                                                        className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition shadow-xs"
                                                     >
-                                                        <Phone className="w-4 h-4" />
+                                                        <Phone className="w-3.5 h-3.5" />
                                                     </a>
                                                 )}
                                             </div>
                                         )}
 
                                         {/* Delivery Address */}
-                                        <div className="flex items-start gap-2 text-sm text-gray-600">
-                                            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                                        <div className="flex items-start gap-2 text-xs text-slate-600 font-medium">
+                                            <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-emerald-600" />
                                             <p className="line-clamp-1">
-                                                {order.deliveryAddress?.addressLine1}, {order.deliveryAddress?.city}
+                                                {[order.deliveryAddress?.addressLine1, order.deliveryAddress?.city].filter(Boolean).join(', ')}
                                             </p>
                                         </div>
 
                                         {/* Live Indicator */}
                                         {order.status === 'OUT_FOR_DELIVERY' && (
-                                            <div className="mt-3 flex items-center gap-2 text-orange-600 bg-orange-50 p-2 rounded-lg">
-                                                <div className="w-2 h-2 bg-orange-600 rounded-full animate-pulse"></div>
-                                                <p className="text-sm font-semibold">🚚 On the way to you!</p>
+                                            <div className="flex items-center gap-2 text-orange-700 bg-orange-50 p-2 rounded-xl border border-orange-200 text-xs font-bold">
+                                                <div className="w-2 h-2 bg-orange-500 rounded-full animate-ping"></div>
+                                                <p>🚚 On the way to your doorstep!</p>
                                             </div>
                                         )}
                                     </div>
@@ -232,13 +192,13 @@ export default function ActiveOrderPopup() {
                         </div>
 
                         {/* Footer */}
-                        <div className="border-t border-gray-200 p-4 bg-gray-50">
+                        <div className="border-t border-slate-100 p-4 bg-slate-50">
                             <button
                                 onClick={() => {
                                     setIsOpen(false);
                                     router.push('/my-orders');
                                 }}
-                                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-bold hover:shadow-lg transition"
+                                className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-slate-800 transition"
                             >
                                 View All Orders
                             </button>
@@ -246,22 +206,6 @@ export default function ActiveOrderPopup() {
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-      `}</style>
         </>
     );
 }
